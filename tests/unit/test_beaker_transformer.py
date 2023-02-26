@@ -16,6 +16,9 @@ class TestBeakerTransformer:
     cat_release = "cat /etc/redhat-release"
     wget = "wget redhat.com"
     default_whiteboard = "This job has been created using mrack."
+    default_tasks = [{"name": "/distribution/dummy", "role": "STANDALONE"}]
+    default_retention_tag = "audit"
+    default_product = "[internal]"
 
     fedora = {
         "name": f"fedora.{domain_name}",
@@ -34,6 +37,20 @@ class TestBeakerTransformer:
         },
     }
 
+    fedora_server = {
+        "name": f"fedora-server.{domain_name}",
+        "role": "server",
+        "group": "server",
+        "os": "fedora-latest",
+        "restraint_id": 1,
+        "beaker": {
+            "ks_meta": "FEDORA_HOST_KS_META",
+            "retention_tag": "active",
+            "product": "cpe:/a:redhat:jboss_operations_network:2.3",
+            "tasks": [{"name": "/distribution/sleep", "role": "STANDALONE"}],
+        },
+    }
+
     centos = {
         "name": f"centos.{domain_name}",
         "role": "server",
@@ -44,6 +61,21 @@ class TestBeakerTransformer:
             "ks_append": [
                 cat_release,
             ],
+        },
+    }
+
+    centos_client = {
+        "name": f"centos-client.{domain_name}",
+        "role": "client",
+        "group": "ipaclient",
+        "os": "c9s",
+        "restraint_id": 2,
+        "beaker": {
+            "ks_append": [
+                cat_release,
+            ],
+            "retention_tag": "scratch",
+            "product": "",
         },
     }
 
@@ -81,7 +113,9 @@ class TestBeakerTransformer:
                 "type": "linux",
                 "hosts": [
                     fedora,
+                    fedora_server,
                     centos,
+                    centos_client,
                     rhel86,
                 ],
             },
@@ -114,67 +148,125 @@ class TestBeakerTransformer:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "meta_host,exp_distro,exp_variant,exp_ks_meta,exp_ks_append,exp_whiteboard,exp_prio",  # noqa: E501
+        "meta_host, exp_values",  # noqa: E501
         [
             (
                 fedora,
-                "Fedora-36%",
-                "Server",
-                "FEDORA_HOST_KS_META",
-                default_ks_append,
-                default_whiteboard,
-                default_prio,
+                {
+                    "distro": "Fedora-36%",
+                    "variant": "Server",
+                    "ks_meta": "FEDORA_HOST_KS_META",
+                    "ks_append": default_ks_append,
+                    "whiteboard": default_whiteboard,
+                    "priority": default_prio,
+                    "tasks": [
+                        {"name": "/distribution/check-install", "role": "SERVER"}
+                    ],
+                    "retention_tag": default_retention_tag,
+                    "product": default_product,
+                },
+            ),
+            (
+                fedora_server,
+                {
+                    "distro": "Fedora-36%",
+                    "variant": "Server",
+                    "ks_meta": "FEDORA_HOST_KS_META",
+                    "ks_append": default_ks_append,
+                    "whiteboard": default_whiteboard,
+                    "priority": default_prio,
+                    "retention_tag": "active",
+                    "product": "cpe:/a:redhat:jboss_operations_network:2.3",
+                    "tasks": [{"name": "/distribution/sleep", "role": "STANDALONE"}],
+                },
             ),
             (
                 centos,
-                "CentOS-Stream-9%",
-                "BaseOS",
-                "PROV_CONF_CENTOS_KS_META",
-                ["%post\ncat /etc/redhat-release\n%end"],
-                default_whiteboard,
-                default_prio,
+                {
+                    "distro": "CentOS-Stream-9%",
+                    "variant": "BaseOS",
+                    "ks_meta": "PROV_CONF_CENTOS_KS_META",
+                    "ks_append": ["%post\ncat /etc/redhat-release\n%end"],
+                    "whiteboard": default_whiteboard,
+                    "priority": default_prio,
+                    "tasks": default_tasks,
+                    "retention_tag": default_retention_tag,
+                    "product": default_product,
+                },
+            ),
+            (
+                centos_client,
+                {
+                    "distro": "CentOS-Stream-9%",
+                    "variant": "BaseOS",
+                    "ks_meta": "PROV_CONF_CENTOS_KS_META",
+                    "ks_append": ["%post\ncat /etc/redhat-release\n%end"],
+                    "whiteboard": default_whiteboard,
+                    "priority": default_prio,
+                    "tasks": default_tasks,
+                    "retention_tag": "scratch",
+                    "product": "",
+                },
             ),
             # default variant should be there,
             # windows distro does not exist so host['os'] should be copied
             (
                 windows,
-                "win-2022",
-                "BaseOS",
-                "PROV_CONF_DEFAULT",
-                default_ks_append,
-                "BEAKER DOES NOT SUPPORT WINDOWS THIS JOB MUST FAIL",
-                "ULTRAHIGH",
+                {
+                    "distro": "win-2022",
+                    "variant": "BaseOS",
+                    "ks_meta": "PROV_CONF_DEFAULT",
+                    "ks_append": default_ks_append,
+                    "whiteboard": "BEAKER DOES NOT SUPPORT WINDOWS THIS JOB MUST FAIL",
+                    "priority": "ULTRAHIGH",
+                    "tasks": default_tasks,
+                    "retention_tag": default_retention_tag,
+                    "product": default_product,
+                },
             ),
             (
                 rhel86,
-                "RHEL-8.6%",
-                "BaseOS",
-                "PROV_CONF_RHEL86_KS_META",
-                ["%post\ncat /etc/redhat-release\nwget redhat.com\n%end"],
-                default_whiteboard,
-                default_prio,
+                {
+                    "distro": "RHEL-8.6%",
+                    "variant": "BaseOS",
+                    "ks_meta": "PROV_CONF_RHEL86_KS_META",
+                    "ks_append": [
+                        "%post\ncat /etc/redhat-release\nwget redhat.com\n%end"
+                    ],
+                    "whiteboard": default_whiteboard,
+                    "priority": default_prio,
+                    "tasks": default_tasks,
+                    "retention_tag": default_retention_tag,
+                    "product": default_product,
+                },
             ),
         ],
     )
     async def test_beaker_requirement(
         self,
         meta_host,
-        exp_distro,
-        exp_variant,
-        exp_ks_meta,
-        exp_ks_append,
-        exp_whiteboard,
-        exp_prio,
+        exp_values,
     ):
         """Test expected Beaker VM variant and distro"""
+        beaker_req_keys = [
+            "distro",
+            "variant",
+            "ks_meta",
+            "ks_append",
+            "whiteboard",
+            "priority",
+            "tasks",
+            "retention_tag",
+            "product",
+        ]
         bkr_transformer = await self.create_transformer()
         req = bkr_transformer.create_host_requirement(meta_host)
-        assert req.get("distro") == exp_distro
-        assert req.get("variant") == exp_variant
-        assert req.get("ks_meta") == exp_ks_meta
-        assert req.get("ks_append") == exp_ks_append
-        assert req.get("whiteboard") == exp_whiteboard
-        assert req.get("priority") == exp_prio
+        for key in beaker_req_keys:
+            err = (
+                f"Mismatch of transformed value and expected value[{key}]: "
+                f"{req.get(key)} != {exp_values.get(key)}"
+            )
+            assert req.get(key) == exp_values.get(key), err
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
